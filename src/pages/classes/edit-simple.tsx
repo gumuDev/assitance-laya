@@ -3,7 +3,6 @@ import { Form, Input, Button, Card, message, Spin } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabaseClient } from "../../utility/supabaseClient";
-import type { IClass } from "../../interfaces";
 
 export const ClassEditSimple: React.FC = () => {
   const [loading, setLoading] = useState(false);
