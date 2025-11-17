@@ -4,10 +4,16 @@ import { Form, Input } from "antd";
 import type { IClass } from "../../interfaces";
 
 export const ClassEdit: React.FC = () => {
-  const { formProps, saveButtonProps } = useForm<IClass>();
+  const { formProps, saveButtonProps } = useForm<IClass>({
+    resource: "classes",
+  });
 
   return (
-    <Edit saveButtonProps={saveButtonProps}>
+    <Edit
+      saveButtonProps={saveButtonProps}
+      title="Editar Clase"
+      resource="classes"
+    >
       <Form {...formProps} layout="vertical">
         <Form.Item
           label="Nombre de la Clase"

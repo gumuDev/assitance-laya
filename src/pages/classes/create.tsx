@@ -4,10 +4,21 @@ import { Form, Input } from "antd";
 import type { IClass } from "../../interfaces";
 
 export const ClassCreate: React.FC = () => {
-  const { formProps, saveButtonProps } = useForm<IClass>();
+  console.log("🚀 ClassCreate component loaded - TITULO: Registrar Clases");
+
+  const { formProps, saveButtonProps } = useForm<IClass>({
+    resource: "classes",
+  });
 
   return (
-    <Create saveButtonProps={saveButtonProps}>
+    <Create
+      saveButtonProps={saveButtonProps}
+      title="Registrar Clases"
+      resource="classes"
+    >
+      <div style={{ padding: '20px', background: '#52c41a', color: 'white', marginBottom: '20px', fontSize: '18px', fontWeight: 'bold', textAlign: 'center' }}>
+        ✅ NUEVO FORMULARIO ACTUALIZADO - Registrar Clases
+      </div>
       <Form {...formProps} layout="vertical">
         <Form.Item
           label="Nombre de la Clase"

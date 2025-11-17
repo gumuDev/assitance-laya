@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Table, Card, DatePicker, Select, Button, Space, Tag, Statistic, Row, Col, Dropdown } from "antd";
+import { Table, Card, DatePicker, Select, Button, Space, Tag, Statistic, Row, Col, Dropdown, Grid, Typography } from "antd";
 import type { MenuProps } from "antd";
 import { DownloadOutlined, UserOutlined, TeamOutlined, CalendarOutlined, FileExcelOutlined, CalendarFilled, ClockCircleOutlined, ProjectOutlined, FilterOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
@@ -11,6 +11,8 @@ import type { IAttendance, IClass } from "../../interfaces";
 dayjs.extend(quarterOfYear);
 
 const { RangePicker } = DatePicker;
+const { useBreakpoint } = Grid;
+const { Text, Title } = Typography;
 
 export const AttendanceHistory: React.FC = () => {
   const [attendances, setAttendances] = useState<IAttendance[]>([]);
@@ -23,6 +25,7 @@ export const AttendanceHistory: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [classes, setClasses] = useState<IClass[]>([]);
   const [activeQuickFilter, setActiveQuickFilter] = useState<"month" | "quarter" | "year" | "custom">("custom");
+  const screens = useBreakpoint();
 
   useEffect(() => {
     loadClasses();
@@ -230,6 +233,70 @@ export const AttendanceHistory: React.FC = () => {
     ],
   };
 
+  // Vista de tarjetas para móviles
+  const renderCards = () => (
+    <Row gutter={[16, 16]}>
+      {loading ? (
+        <Col span={24}>
+          <Card loading={true} />
+        </Col>
+      ) : attendances.length === 0 ? (
+        <Col span={24}>
+          <Card>
+            <Text type="secondary">No hay registros de asistencia en el rango seleccionado</Text>
+          </Card>
+        </Col>
+      ) : (
+        attendances.map((record) => {
+          const person = record.person_type === "teacher" ? record.teachers : record.members;
+          return (
+            <Col xs={24} sm={24} md={12} lg={8} key={record.id}>
+              <Card
+                hoverable
+                style={{ borderRadius: 8 }}
+              >
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Fecha y Hora</Text>
+                    <Title level={5} style={{ margin: '4px 0 0 0' }}>
+                      {dayjs(record.timestamp).format("DD/MM/YYYY HH:mm:ss")}
+                    </Title>
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Nombre</Text>
+                    <div style={{ marginTop: 4 }}>
+                      <Text strong>
+                        {person ? `${person.first_name} ${person.last_name}` : "N/A"}
+                      </Text>
+                    </div>
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Tipo</Text>
+                    <div style={{ marginTop: 4 }}>
+                      <Tag color={record.person_type === "teacher" ? "blue" : "green"}>
+                        {record.person_type === "teacher" ? "MAESTRO" : "MIEMBRO"}
+                      </Tag>
+                    </div>
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>Clase</Text>
+                    <div style={{ marginTop: 4 }}>
+                      <Text>
+                        {record.classes
+                          ? `${record.classes.name} - ${record.classes.class_number}`
+                          : "N/A"}
+                      </Text>
+                    </div>
+                  </div>
+                </Space>
+              </Card>
+            </Col>
+          );
+        })
+      )}
+    </Row>
+  );
+
   const columns = [
     {
       title: "Fecha",
@@ -421,16 +488,21 @@ export const AttendanceHistory: React.FC = () => {
 
       {/* Tabla de asistencias */}
       <Card>
-        <Table
-          dataSource={attendances}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            pageSize: 20,
-            showTotal: (total) => `Total: ${total} registros`,
-          }}
-        />
+        {/* Renderiza tabla en escritorio, cards en móvil */}
+        {screens.md ? (
+          <Table
+            dataSource={attendances}
+            columns={columns}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              pageSize: 20,
+              showTotal: (total) => `Total: ${total} registros`,
+            }}
+          />
+        ) : (
+          renderCards()
+        )}
       </Card>
     </div>
   );

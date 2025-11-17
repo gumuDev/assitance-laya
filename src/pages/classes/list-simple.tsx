@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Space, Tooltip } from "antd";
+import { Table, Button, Space, Tooltip, Card, Row, Col, Grid, Typography, Tag } from "antd";
 import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { IClass } from "../../interfaces";
 
+const { useBreakpoint } = Grid;
+const { Text, Title } = Typography;
+
 export const ClassListSimple: React.FC = () => {
   const [classes, setClasses] = useState<IClass[]>([]);
   const [loading, setLoading] = useState(true);
+  const screens = useBreakpoint();
 
   useEffect(() => {
     loadClasses();
@@ -41,6 +45,69 @@ export const ClassListSimple: React.FC = () => {
       }
     }
   };
+
+  // Vista de tarjetas para móviles
+  const renderCards = () => (
+    <Row gutter={[16, 16]}>
+      {loading ? (
+        <Col span={24}>
+          <Card loading={true} />
+        </Col>
+      ) : (
+        classes.map((record) => (
+          <Col xs={24} sm={24} md={12} lg={8} key={record.id}>
+            <Card
+              hoverable
+              style={{ borderRadius: 8 }}
+              actions={[
+                <Tooltip title="Ver" key="view">
+                  <Button
+                    type="primary"
+                    icon={<EyeOutlined />}
+                    onClick={() => window.location.href = `/classes/show/${record.id}`}
+                  />
+                </Tooltip>,
+                <Tooltip title="Editar" key="edit">
+                  <Button
+                    icon={<EditOutlined />}
+                    onClick={() => window.location.href = `/classes/edit/${record.id}`}
+                  />
+                </Tooltip>,
+                <Tooltip title="Eliminar" key="delete">
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDelete(record.id)}
+                  />
+                </Tooltip>,
+              ]}
+            >
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Nombre</Text>
+                  <Title level={5} style={{ margin: '4px 0 0 0' }}>
+                    {record.name}
+                  </Title>
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Número de Clase</Text>
+                  <div style={{ marginTop: 4 }}>
+                    <Tag color="blue">{record.class_number}</Tag>
+                  </div>
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Fecha de Creación</Text>
+                  <div style={{ marginTop: 4 }}>
+                    <Text>{new Date(record.created_at).toLocaleString("es-ES")}</Text>
+                  </div>
+                </div>
+              </Space>
+            </Card>
+          </Col>
+        ))
+      )}
+    </Row>
+  );
 
   const columns = [
     {
@@ -101,12 +168,18 @@ export const ClassListSimple: React.FC = () => {
           Crear Clase
         </Button>
       </div>
-      <Table
-        dataSource={classes}
-        columns={columns}
-        rowKey="id"
-        loading={loading}
-      />
+
+      {/* Renderiza tabla en escritorio, cards en móvil */}
+      {screens.md ? (
+        <Table
+          dataSource={classes}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+        />
+      ) : (
+        renderCards()
+      )}
     </div>
   );
 };

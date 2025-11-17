@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Table, Button, Space, Tooltip, Tag } from "antd";
+import { Table, Button, Space, Tooltip, Tag, Card, Row, Col, Grid, Typography } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { ITeacher } from "../../interfaces";
 
+const { useBreakpoint } = Grid;
+const { Text, Title } = Typography;
+
 export const TeacherList: React.FC = () => {
   const [teachers, setTeachers] = useState<ITeacher[]>([]);
   const [loading, setLoading] = useState(true);
+  const screens = useBreakpoint();
 
   useEffect(() => {
     loadTeachers();
@@ -48,6 +52,75 @@ export const TeacherList: React.FC = () => {
       }
     }
   };
+
+  // Vista de tarjetas para móviles
+  const renderCards = () => (
+    <Row gutter={[16, 16]}>
+      {loading ? (
+        <Col span={24}>
+          <Card loading={true} />
+        </Col>
+      ) : (
+        teachers.map((record) => (
+          <Col xs={24} sm={24} md={12} lg={8} key={record.id}>
+            <Card
+              hoverable
+              style={{ borderRadius: 8 }}
+              actions={[
+                <Tooltip title="Ver Credencial" key="view">
+                  <Button
+                    type="primary"
+                    icon={<QrcodeOutlined />}
+                    onClick={() => window.location.href = `/teachers/show/${record.id}`}
+                  />
+                </Tooltip>,
+                <Tooltip title="Editar" key="edit">
+                  <Button
+                    icon={<EditOutlined />}
+                    onClick={() => window.location.href = `/teachers/edit/${record.id}`}
+                  />
+                </Tooltip>,
+                <Tooltip title="Eliminar" key="delete">
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDelete(record.id)}
+                  />
+                </Tooltip>,
+              ]}
+            >
+              <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Nombre</Text>
+                  <Title level={5} style={{ margin: '4px 0 0 0' }}>
+                    {record.first_name} {record.last_name}
+                  </Title>
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Clase Asignada</Text>
+                  <div style={{ marginTop: 4 }}>
+                    {record.classes ? (
+                      <Tag color="blue">
+                        {record.classes.name} - {record.classes.class_number}
+                      </Tag>
+                    ) : (
+                      <Tag>Sin asignar</Tag>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Fecha de Creación</Text>
+                  <div style={{ marginTop: 4 }}>
+                    <Text>{new Date(record.created_at).toLocaleString("es-ES")}</Text>
+                  </div>
+                </div>
+              </Space>
+            </Card>
+          </Col>
+        ))
+      )}
+    </Row>
+  );
 
   const columns = [
     {
@@ -119,12 +192,18 @@ export const TeacherList: React.FC = () => {
           Registrar Maestro
         </Button>
       </div>
-      <Table
-        dataSource={teachers}
-        columns={columns}
-        rowKey="id"
-        loading={loading}
-      />
+
+      {/* Renderiza tabla en escritorio, cards en móvil */}
+      {screens.md ? (
+        <Table
+          dataSource={teachers}
+          columns={columns}
+          rowKey="id"
+          loading={loading}
+        />
+      ) : (
+        renderCards()
+      )}
     </div>
   );
 };

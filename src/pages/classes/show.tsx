@@ -7,13 +7,15 @@ import type { IClass } from "../../interfaces";
 const { Title } = Typography;
 
 export const ClassShow: React.FC = () => {
-  const { query } = useShow<IClass>();
+  const { query } = useShow<IClass>({
+    resource: "classes",
+  });
   const { data, isLoading } = query;
 
   const record = data?.data;
 
   return (
-    <Show isLoading={isLoading}>
+    <Show isLoading={isLoading} title="Detalle de Clase" resource="classes">
       <Title level={5}>ID</Title>
       <TextField value={record?.id} />
 

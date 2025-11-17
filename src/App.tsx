@@ -8,6 +8,7 @@ import {
 import { dataProvider } from "@refinedev/supabase";
 import { BrowserRouter, Outlet, Route, Routes, Navigate } from "react-router-dom";
 import { ConfigProvider } from "antd";
+import { BookOutlined, SolutionOutlined, TeamOutlined, CameraOutlined, HistoryOutlined } from "@ant-design/icons";
 import esES from "antd/locale/es_ES";
 import "@refinedev/antd/dist/reset.css";
 
@@ -19,6 +20,7 @@ import { ClassShowSimple } from "./pages/classes/show-simple";
 import { TeacherList, TeacherCreate, TeacherEdit, TeacherShow } from "./pages/teachers";
 import { MemberList, MemberCreate, MemberEdit, MemberShow } from "./pages/members";
 import { AttendanceScanner, AttendanceHistory } from "./pages/attendance";
+import { Title } from "./components/Title";
 
 function App() {
   return (
@@ -37,6 +39,11 @@ function App() {
                 show: "/classes/show/:id",
                 meta: {
                   label: "Clases",
+                  icon: <BookOutlined />,
+                  canCreate: true,
+                },
+                options: {
+                  label: "Clases",
                 },
               },
               {
@@ -47,6 +54,7 @@ function App() {
                 show: "/teachers/show/:id",
                 meta: {
                   label: "Maestros",
+                  icon: <SolutionOutlined />,
                 },
               },
               {
@@ -57,6 +65,7 @@ function App() {
                 show: "/members/show/:id",
                 meta: {
                   label: "Miembros",
+                  icon: <TeamOutlined />,
                 },
               },
               {
@@ -64,6 +73,7 @@ function App() {
                 list: "/attendance",
                 meta: {
                   label: "Registrar Asistencia",
+                  icon: <CameraOutlined />,
                 },
               },
               {
@@ -71,6 +81,7 @@ function App() {
                 list: "/history",
                 meta: {
                   label: "Historial de Asistencia",
+                  icon: <HistoryOutlined />,
                 },
               },
             ]}
@@ -78,7 +89,7 @@ function App() {
             <Routes>
               <Route
                 element={
-                  <ThemedLayoutV2>
+                  <ThemedLayoutV2 Title={Title}>
                     <Outlet />
                   </ThemedLayoutV2>
                 }
