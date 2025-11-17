@@ -6,7 +6,7 @@ import {
   useNotificationProvider,
 } from "@refinedev/antd";
 import { dataProvider } from "@refinedev/supabase";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes, Navigate } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import esES from "antd/locale/es_ES";
 import "@refinedev/antd/dist/reset.css";
@@ -83,7 +83,7 @@ function App() {
                   </ThemedLayoutV2>
                 }
               >
-                <Route index element={<div style={{ padding: 20 }}>Dashboard - En construcción</div>} />
+                <Route index element={<Navigate to="/history" replace />} />
 
                 <Route path="/classes">
                   <Route index element={<ClassListSimple />} />
