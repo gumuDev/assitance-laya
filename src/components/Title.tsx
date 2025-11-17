@@ -1,9 +1,6 @@
 import React from "react";
 import { SafetyCertificateOutlined } from "@ant-design/icons";
-
-interface TitleProps {
-  collapsed?: boolean;
-}
+import type { TitleProps } from "@refinedev/core";
 
 export const Title: React.FC<TitleProps> = ({ collapsed }) => {
   return (
