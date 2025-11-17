@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Card, Alert, Tag, Spin, Button, Typography } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined, CameraOutlined, ReloadOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, CloseCircleOutlined, CameraOutlined } from "@ant-design/icons";
 import { BrowserMultiFormatReader } from "@zxing/library";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { ITeacher, IMember } from "../../interfaces";
@@ -133,7 +133,7 @@ Si el problema persiste, intenta:
       codeReader.decodeFromVideoDevice(
         selectedDeviceId,
         videoRef.current!,
-        async (result, error) => {
+        async (result) => {
           if (result && !processing) {
             const qrCode = result.getText();
             console.log("QR detectado:", qrCode);
@@ -165,7 +165,7 @@ Si el problema persiste, intenta:
 
     try {
       // 1. Buscar en maestros
-      const { data: teacher, error: teacherError } = await supabaseClient
+      const { data: teacher } = await supabaseClient
         .from("teachers")
         .select(`
           *,
@@ -190,7 +190,7 @@ Si el problema persiste, intenta:
       }
 
       // 2. Buscar en miembros
-      const { data: member, error: memberError } = await supabaseClient
+      const { data: member } = await supabaseClient
         .from("members")
         .select(`
           *,

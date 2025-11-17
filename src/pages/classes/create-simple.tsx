@@ -11,7 +11,7 @@ export const ClassCreateSimple: React.FC = () => {
 
   const onFinish = async (values: any) => {
     setLoading(true);
-    const { data, error } = await supabaseClient
+    const { error } = await supabaseClient
       .from("classes")
       .insert([
         {

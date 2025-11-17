@@ -5,14 +5,13 @@ import {
   ThemedLayoutV2,
   useNotificationProvider,
 } from "@refinedev/antd";
-import { dataProvider, liveProvider } from "@refinedev/supabase";
+import { dataProvider } from "@refinedev/supabase";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { ConfigProvider } from "antd";
 import esES from "antd/locale/es_ES";
 import "@refinedev/antd/dist/reset.css";
 
 import { supabaseClient } from "./utility/supabaseClient";
-import { ClassList, ClassCreate, ClassEdit, ClassShow } from "./pages/classes";
 import { ClassListSimple } from "./pages/classes/list-simple";
 import { ClassCreateSimple } from "./pages/classes/create-simple";
 import { ClassEditSimple } from "./pages/classes/edit-simple";
@@ -20,7 +19,6 @@ import { ClassShowSimple } from "./pages/classes/show-simple";
 import { TeacherList, TeacherCreate, TeacherEdit, TeacherShow } from "./pages/teachers";
 import { MemberList, MemberCreate, MemberEdit, MemberShow } from "./pages/members";
 import { AttendanceScanner, AttendanceHistory } from "./pages/attendance";
-import { TestSupabase } from "./test-supabase";
 
 function App() {
   return (

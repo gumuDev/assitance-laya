@@ -3,7 +3,7 @@ import { Form, Input, Button, Card, message, Select, Spin } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabaseClient } from "../../utility/supabaseClient";
-import type { IClass, IMember } from "../../interfaces";
+import type { IClass } from "../../interfaces";
 
 export const MemberEdit: React.FC = () => {
   const [loading, setLoading] = useState(false);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Table, Button, Space, Tooltip, Tag } from "antd";
-import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined, QrcodeOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, DeleteOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { ITeacher } from "../../interfaces";
 

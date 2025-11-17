@@ -3,9 +3,12 @@ import { Table, Card, DatePicker, Select, Button, Space, Tag, Statistic, Row, Co
 import type { MenuProps } from "antd";
 import { DownloadOutlined, UserOutlined, TeamOutlined, CalendarOutlined, FileExcelOutlined, CalendarFilled, ClockCircleOutlined, ProjectOutlined, FilterOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
+import quarterOfYear from "dayjs/plugin/quarterOfYear";
 import * as XLSX from "xlsx";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { IAttendance, IClass } from "../../interfaces";
+
+dayjs.extend(quarterOfYear);
 
 const { RangePicker } = DatePicker;
 
