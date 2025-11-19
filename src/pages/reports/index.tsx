@@ -12,6 +12,8 @@ import {
   Dropdown,
   Tag,
   Spin,
+  Table,
+  Tabs,
 } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -23,6 +25,8 @@ import {
   CalendarFilled,
   ClockCircleOutlined,
   ProjectOutlined,
+  TrophyOutlined,
+  CrownOutlined,
 } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import quarterOfYear from "dayjs/plugin/quarterOfYear";
@@ -41,7 +45,7 @@ import {
 import type { ChartOptions } from "chart.js";
 import { Bar, Line, Pie } from "react-chartjs-2";
 import { supabaseClient } from "../../utility/supabaseClient";
-import type { IAttendance, IClass } from "../../interfaces";
+import type { IAttendance, IClass, ITeacher, IMember } from "../../interfaces";
 
 dayjs.extend(quarterOfYear);
 
@@ -70,10 +74,15 @@ export const Reports: React.FC = () => {
   ]);
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [classes, setClasses] = useState<IClass[]>([]);
+  const [teachers, setTeachers] = useState<ITeacher[]>([]);
+  const [members, setMembers] = useState<IMember[]>([]);
   const [activeQuickFilter, setActiveQuickFilter] = useState<
     "month" | "quarter" | "year" | "custom"
   >("custom");
+  const [rankingView, setRankingView] = useState<"classes" | "teachers" | "members">("classes");
+  const [mainView, setMainView] = useState<"rankings" | "charts">("rankings");
 
   // Referencias para los gráficos
   const barChartRef = useRef<any>(null);
@@ -82,11 +91,13 @@ export const Reports: React.FC = () => {
 
   useEffect(() => {
     loadClasses();
+    loadTeachers();
+    loadMembers();
   }, []);
 
   useEffect(() => {
     loadAttendances();
-  }, [dateRange, classFilter, typeFilter]);
+  }, [dateRange, classFilter, typeFilter, personFilter]);
 
   const loadClasses = async () => {
     const { data, error } = await supabaseClient
@@ -96,6 +107,28 @@ export const Reports: React.FC = () => {
 
     if (!error && data) {
       setClasses(data);
+    }
+  };
+
+  const loadTeachers = async () => {
+    const { data, error } = await supabaseClient
+      .from("teachers")
+      .select("*")
+      .order("first_name");
+
+    if (!error && data) {
+      setTeachers(data);
+    }
+  };
+
+  const loadMembers = async () => {
+    const { data, error } = await supabaseClient
+      .from("members")
+      .select("*")
+      .order("first_name");
+
+    if (!error && data) {
+      setMembers(data);
     }
   };
 
@@ -122,6 +155,10 @@ export const Reports: React.FC = () => {
 
     if (typeFilter) {
       query = query.eq("person_type", typeFilter);
+    }
+
+    if (personFilter) {
+      query = query.eq("person_id", personFilter);
     }
 
     const { data, error } = await query;
@@ -353,6 +390,103 @@ export const Reports: React.FC = () => {
     },
   };
 
+  // Funciones para calcular rankings
+  const getTopClasses = () => {
+    const attendanceByClass: Record<string, { count: number; name: string }> = {};
+
+    attendances.forEach((att) => {
+      if (att.class_id && att.classes) {
+        const className = `${att.classes.name} - ${att.classes.class_number}`;
+        if (!attendanceByClass[att.class_id]) {
+          attendanceByClass[att.class_id] = { count: 0, name: className };
+        }
+        attendanceByClass[att.class_id].count++;
+      }
+    });
+
+    const sorted = Object.entries(attendanceByClass)
+      .map(([id, data]) => ({
+        id,
+        name: data.name,
+        count: data.count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const maxCount = sorted[0]?.count || 1;
+    return sorted.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      percentage: Math.round((item.count / maxCount) * 100),
+    }));
+  };
+
+  const getTopTeachers = () => {
+    const attendanceByTeacher: Record<string, { count: number; name: string }> = {};
+
+    attendances
+      .filter((att) => att.person_type === "teacher")
+      .forEach((att) => {
+        const teacher = teachers.find((t) => t.id === att.person_id);
+        if (teacher) {
+          const name = `${teacher.first_name} ${teacher.last_name}`;
+          if (!attendanceByTeacher[att.person_id]) {
+            attendanceByTeacher[att.person_id] = { count: 0, name };
+          }
+          attendanceByTeacher[att.person_id].count++;
+        }
+      });
+
+    const sorted = Object.entries(attendanceByTeacher)
+      .map(([id, data]) => ({
+        id,
+        name: data.name,
+        count: data.count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const maxCount = sorted[0]?.count || 1;
+    return sorted.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      percentage: Math.round((item.count / maxCount) * 100),
+    }));
+  };
+
+  const getTopMembers = () => {
+    const attendanceByMember: Record<string, { count: number; name: string }> = {};
+
+    attendances
+      .filter((att) => att.person_type === "member")
+      .forEach((att) => {
+        const member = members.find((m) => m.id === att.person_id);
+        if (member) {
+          const name = `${member.first_name} ${member.last_name}`;
+          if (!attendanceByMember[att.person_id]) {
+            attendanceByMember[att.person_id] = { count: 0, name };
+          }
+          attendanceByMember[att.person_id].count++;
+        }
+      });
+
+    const sorted = Object.entries(attendanceByMember)
+      .map(([id, data]) => ({
+        id,
+        name: data.name,
+        count: data.count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const maxCount = sorted[0]?.count || 1;
+    return sorted.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      percentage: Math.round((item.count / maxCount) * 100),
+    }));
+  };
+
   // Calcular estadísticas
   const totalAttendances = attendances.length;
   const teacherAttendances = attendances.filter(
@@ -463,11 +597,43 @@ export const Reports: React.FC = () => {
                 placeholder="Filtrar por tipo"
                 allowClear
                 value={typeFilter}
-                onChange={setTypeFilter}
+                onChange={(value) => {
+                  setTypeFilter(value);
+                  setPersonFilter(null);
+                }}
                 options={[
                   { label: "Todos", value: null },
                   { label: "Maestros", value: "teacher" },
                   { label: "Miembros", value: "member" },
+                ]}
+              />
+
+              <Select
+                style={{ width: 250 }}
+                placeholder="Filtrar por persona"
+                allowClear
+                showSearch
+                value={personFilter}
+                onChange={setPersonFilter}
+                filterOption={(input, option) =>
+                  (option?.label?.toString() ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+                options={[
+                  { label: "Todas las personas", value: null },
+                  ...(typeFilter === "teacher" || typeFilter === null
+                    ? teachers.map((t) => ({
+                        label: `👨‍🏫 ${t.first_name} ${t.last_name}`,
+                        value: t.id,
+                      }))
+                    : []),
+                  ...(typeFilter === "member" || typeFilter === null
+                    ? members.map((m) => ({
+                        label: `👤 ${m.first_name} ${m.last_name}`,
+                        value: m.id,
+                      }))
+                    : []),
                 ]}
               />
             </Space>
@@ -493,9 +659,200 @@ export const Reports: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <>
-          {/* Gráfico de Barras - Asistencia por Clase */}
-          <Card
+        <Card>
+          <Tabs
+            activeKey={mainView}
+            onChange={(key) => setMainView(key as "rankings" | "charts")}
+            size="large"
+            items={[
+              {
+                key: "rankings",
+                label: (
+                  <span>
+                    <TrophyOutlined /> Rankings
+                  </span>
+                ),
+                children: (
+                  <Card
+                    title={
+                      <Space>
+                        <CrownOutlined />
+                        <span>Rankings Top 10</span>
+                      </Space>
+                    }
+                    bordered={false}
+                  >
+                    <Tabs
+                      activeKey={rankingView}
+                      onChange={(key) => setRankingView(key as "classes" | "teachers" | "members")}
+                      items={[
+                        {
+                          key: "classes",
+                          label: "Por Clase",
+                          children: (
+                            <Table
+                              dataSource={getTopClasses()}
+                              rowKey="id"
+                              pagination={false}
+                              columns={[
+                                {
+                                  title: "Posición",
+                                  dataIndex: "rank",
+                                  key: "rank",
+                                  width: 100,
+                                  render: (rank: number) => {
+                                    if (rank === 1) return <span style={{ fontSize: 20 }}>🥇 {rank}</span>;
+                                    if (rank === 2) return <span style={{ fontSize: 20 }}>🥈 {rank}</span>;
+                                    if (rank === 3) return <span style={{ fontSize: 20 }}>🥉 {rank}</span>;
+                                    return <span>{rank}</span>;
+                                  },
+                                },
+                                {
+                                  title: "Clase",
+                                  dataIndex: "name",
+                                  key: "name",
+                                },
+                                {
+                                  title: "Total de Asistencias",
+                                  dataIndex: "count",
+                                  key: "count",
+                                  align: "center",
+                                },
+                                {
+                                  title: "Porcentaje",
+                                  dataIndex: "percentage",
+                                  key: "percentage",
+                                  align: "center",
+                                  render: (percentage: number) => (
+                                    <Tag color={percentage === 100 ? "gold" : "blue"}>
+                                      {percentage}%
+                                    </Tag>
+                                  ),
+                                },
+                              ]}
+                            />
+                          ),
+                        },
+                        {
+                          key: "teachers",
+                          label: "Por Maestro",
+                          children: (
+                            <Table
+                              dataSource={getTopTeachers()}
+                              rowKey="id"
+                              pagination={false}
+                              columns={[
+                                {
+                                  title: "Posición",
+                                  dataIndex: "rank",
+                                  key: "rank",
+                                  width: 100,
+                                  render: (rank: number) => {
+                                    if (rank === 1) return <span style={{ fontSize: 20 }}>🥇 {rank}</span>;
+                                    if (rank === 2) return <span style={{ fontSize: 20 }}>🥈 {rank}</span>;
+                                    if (rank === 3) return <span style={{ fontSize: 20 }}>🥉 {rank}</span>;
+                                    return <span>{rank}</span>;
+                                  },
+                                },
+                                {
+                                  title: "Maestro",
+                                  dataIndex: "name",
+                                  key: "name",
+                                  render: (name: string) => (
+                                    <span>
+                                      👨‍🏫 {name}
+                                    </span>
+                                  ),
+                                },
+                                {
+                                  title: "Total de Asistencias",
+                                  dataIndex: "count",
+                                  key: "count",
+                                  align: "center",
+                                },
+                                {
+                                  title: "Porcentaje",
+                                  dataIndex: "percentage",
+                                  key: "percentage",
+                                  align: "center",
+                                  render: (percentage: number) => (
+                                    <Tag color={percentage === 100 ? "gold" : "blue"}>
+                                      {percentage}%
+                                    </Tag>
+                                  ),
+                                },
+                              ]}
+                            />
+                          ),
+                        },
+                        {
+                          key: "members",
+                          label: "Por Miembro",
+                          children: (
+                            <Table
+                              dataSource={getTopMembers()}
+                              rowKey="id"
+                              pagination={false}
+                              columns={[
+                                {
+                                  title: "Posición",
+                                  dataIndex: "rank",
+                                  key: "rank",
+                                  width: 100,
+                                  render: (rank: number) => {
+                                    if (rank === 1) return <span style={{ fontSize: 20 }}>🥇 {rank}</span>;
+                                    if (rank === 2) return <span style={{ fontSize: 20 }}>🥈 {rank}</span>;
+                                    if (rank === 3) return <span style={{ fontSize: 20 }}>🥉 {rank}</span>;
+                                    return <span>{rank}</span>;
+                                  },
+                                },
+                                {
+                                  title: "Miembro",
+                                  dataIndex: "name",
+                                  key: "name",
+                                  render: (name: string) => (
+                                    <span>
+                                      👤 {name}
+                                    </span>
+                                  ),
+                                },
+                                {
+                                  title: "Total de Asistencias",
+                                  dataIndex: "count",
+                                  key: "count",
+                                  align: "center",
+                                },
+                                {
+                                  title: "Porcentaje",
+                                  dataIndex: "percentage",
+                                  key: "percentage",
+                                  align: "center",
+                                  render: (percentage: number) => (
+                                    <Tag color={percentage === 100 ? "gold" : "green"}>
+                                      {percentage}%
+                                    </Tag>
+                                  ),
+                                },
+                              ]}
+                            />
+                          ),
+                        },
+                      ]}
+                    />
+                  </Card>
+                ),
+              },
+              {
+                key: "charts",
+                label: (
+                  <span>
+                    <BarChartOutlined /> Gráficos
+                  </span>
+                ),
+                children: (
+                  <>
+                    {/* Gráfico de Barras - Asistencia por Clase */}
+                    <Card
             style={{ marginBottom: 16 }}
             title={
               <Space>
@@ -577,6 +934,11 @@ export const Reports: React.FC = () => {
             </Row>
           </Card>
         </>
+                ),
+              },
+            ]}
+          />
+        </Card>
       )}
     </div>
   );

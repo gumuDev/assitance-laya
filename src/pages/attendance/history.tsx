@@ -6,7 +6,7 @@ import dayjs, { Dayjs } from "dayjs";
 import quarterOfYear from "dayjs/plugin/quarterOfYear";
 import * as XLSX from "xlsx";
 import { supabaseClient } from "../../utility/supabaseClient";
-import type { IAttendance, IClass } from "../../interfaces";
+import type { IAttendance, IClass, ITeacher, IMember } from "../../interfaces";
 
 dayjs.extend(quarterOfYear);
 
@@ -23,17 +23,22 @@ export const AttendanceHistory: React.FC = () => {
   ]);
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [personFilter, setPersonFilter] = useState<string | null>(null);
   const [classes, setClasses] = useState<IClass[]>([]);
+  const [teachers, setTeachers] = useState<ITeacher[]>([]);
+  const [members, setMembers] = useState<IMember[]>([]);
   const [activeQuickFilter, setActiveQuickFilter] = useState<"month" | "quarter" | "year" | "custom">("custom");
   const screens = useBreakpoint();
 
   useEffect(() => {
     loadClasses();
+    loadTeachers();
+    loadMembers();
   }, []);
 
   useEffect(() => {
     loadAttendances();
-  }, [dateRange, classFilter, typeFilter]);
+  }, [dateRange, classFilter, typeFilter, personFilter]);
 
   const loadClasses = async () => {
     const { data, error } = await supabaseClient
@@ -43,6 +48,28 @@ export const AttendanceHistory: React.FC = () => {
 
     if (!error && data) {
       setClasses(data);
+    }
+  };
+
+  const loadTeachers = async () => {
+    const { data, error } = await supabaseClient
+      .from("teachers")
+      .select("*")
+      .order("first_name");
+
+    if (!error && data) {
+      setTeachers(data);
+    }
+  };
+
+  const loadMembers = async () => {
+    const { data, error} = await supabaseClient
+      .from("members")
+      .select("*")
+      .order("first_name");
+
+    if (!error && data) {
+      setMembers(data);
     }
   };
 
@@ -69,6 +96,10 @@ export const AttendanceHistory: React.FC = () => {
 
     if (typeFilter) {
       query = query.eq("person_type", typeFilter);
+    }
+
+    if (personFilter) {
+      query = query.eq("person_id", personFilter);
     }
 
     const { data, error } = await query;
@@ -436,7 +467,10 @@ export const AttendanceHistory: React.FC = () => {
                 placeholder="Filtrar por clase"
                 allowClear
                 value={classFilter}
-                onChange={setClassFilter}
+                onChange={(value) => {
+                  setClassFilter(value);
+                  setPersonFilter(null); // Limpiar filtro de persona al cambiar clase
+                }}
                 options={[
                   { label: "Todas las clases", value: null },
                   ...classes.map((c) => ({
@@ -451,11 +485,41 @@ export const AttendanceHistory: React.FC = () => {
                 placeholder="Filtrar por tipo"
                 allowClear
                 value={typeFilter}
-                onChange={setTypeFilter}
+                onChange={(value) => {
+                  setTypeFilter(value);
+                  setPersonFilter(null); // Limpiar filtro de persona al cambiar tipo
+                }}
                 options={[
                   { label: "Todos", value: null },
                   { label: "Maestros", value: "teacher" },
                   { label: "Miembros", value: "member" },
+                ]}
+              />
+
+              <Select
+                style={{ width: 250 }}
+                placeholder="Filtrar por persona"
+                allowClear
+                showSearch
+                value={personFilter}
+                onChange={setPersonFilter}
+                filterOption={(input, option) =>
+                  (option?.label?.toString() ?? "").toLowerCase().includes(input.toLowerCase())
+                }
+                options={[
+                  { label: "Todas las personas", value: null },
+                  ...(typeFilter === "teacher" || typeFilter === null
+                    ? teachers.map((t) => ({
+                        label: `👨‍🏫 ${t.first_name} ${t.last_name}`,
+                        value: t.id,
+                      }))
+                    : []),
+                  ...(typeFilter === "member" || typeFilter === null
+                    ? members.map((m) => ({
+                        label: `👤 ${m.first_name} ${m.last_name}`,
+                        value: m.id,
+                      }))
+                    : []),
                 ]}
               />
             </Space>
