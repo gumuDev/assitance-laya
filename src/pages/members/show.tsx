@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, Button, Spin, message, Tag } from "antd";
-import { ArrowLeftOutlined, EditOutlined, DownloadOutlined } from "@ant-design/icons";
+import { Card, Button, Spin, message, Tag, Dropdown } from "antd";
+import { ArrowLeftOutlined, EditOutlined, DownloadOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import html2canvas from "html2canvas";
+import QRCode from "qrcode";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { IMember } from "../../interfaces";
+import type { MenuProps } from "antd";
 
 export const MemberShow: React.FC = () => {
   const [member, setMember] = useState<IMember | null>(null);
@@ -66,6 +68,69 @@ export const MemberShow: React.FC = () => {
     setDownloading(false);
   };
 
+  const downloadQROnly = () => {
+    if (!member) return;
+
+    try {
+      // Crear un SVG temporal solo con el QR
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "400");
+      svg.setAttribute("height", "400");
+      svg.setAttribute("viewBox", "0 0 400 400");
+
+      // Crear un fondo blanco
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("width", "400");
+      rect.setAttribute("height", "400");
+      rect.setAttribute("fill", "white");
+      svg.appendChild(rect);
+
+      // Crear el QR usando QRCodeSVG manualmente
+      const qrContainer = document.createElement("div");
+      qrContainer.style.position = "absolute";
+      qrContainer.style.left = "-9999px";
+      document.body.appendChild(qrContainer);
+
+      // Renderizar QR temporal
+      const tempDiv = document.createElement("div");
+      qrContainer.appendChild(tempDiv);
+
+      // Usar canvas para generar la imagen del QR
+      const canvas = document.createElement("canvas");
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext("2d");
+
+      if (ctx) {
+        // Fondo blanco
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, 400, 400);
+
+        // Generar QR en un canvas temporal
+        QRCode.toCanvas(canvas, member.qr_code, {
+          width: 400,
+          margin: 2,
+          errorCorrectionLevel: "H",
+        }, (error: any) => {
+          if (error) {
+            message.error("Error al generar el código QR");
+            console.error(error);
+          } else {
+            const link = document.createElement("a");
+            link.download = `qr-${member.first_name}-${member.last_name}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+            message.success("Código QR descargado exitosamente");
+          }
+          document.body.removeChild(qrContainer);
+        });
+      }
+    } catch (error) {
+      message.error("Error al descargar el código QR");
+      console.error(error);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
@@ -81,6 +146,21 @@ export const MemberShow: React.FC = () => {
       </div>
     );
   }
+
+  const downloadMenuItems: MenuProps['items'] = [
+    {
+      key: 'credential',
+      label: 'Credencial Completa',
+      icon: <DownloadOutlined />,
+      onClick: downloadCredential,
+    },
+    {
+      key: 'qr',
+      label: 'Solo Código QR',
+      icon: <QrcodeOutlined />,
+      onClick: downloadQROnly,
+    },
+  ];
 
   return (
     <div style={{ padding: 24 }}>
@@ -100,14 +180,15 @@ export const MemberShow: React.FC = () => {
         >
           Editar
         </Button>
-        <Button
-          type="default"
-          icon={<DownloadOutlined />}
-          onClick={downloadCredential}
-          loading={downloading}
-        >
-          Descargar Credencial
-        </Button>
+        <Dropdown menu={{ items: downloadMenuItems }} placement="bottomRight">
+          <Button
+            type="default"
+            icon={<DownloadOutlined />}
+            loading={downloading}
+          >
+            Descargar
+          </Button>
+        </Dropdown>
       </div>
 
       {/* Credencial del Miembro con fondo verde */}

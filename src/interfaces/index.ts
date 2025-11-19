@@ -2,6 +2,8 @@ export interface IClass {
   id: string;
   name: string;
   class_number: string;
+  start_time: string;
+  end_time: string;
   created_at: string;
   updated_at: string;
 }

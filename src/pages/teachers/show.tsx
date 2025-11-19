@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, Button, Spin, message, Tag } from "antd";
-import { ArrowLeftOutlined, EditOutlined, DownloadOutlined } from "@ant-design/icons";
+import { Card, Button, Spin, message, Tag, Dropdown } from "antd";
+import { ArrowLeftOutlined, EditOutlined, DownloadOutlined, QrcodeOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import html2canvas from "html2canvas";
+import QRCode from "qrcode";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { ITeacher } from "../../interfaces";
+import type { MenuProps } from "antd";
 
 export const TeacherShow: React.FC = () => {
   const [teacher, setTeacher] = useState<ITeacher | null>(null);
@@ -66,6 +68,42 @@ export const TeacherShow: React.FC = () => {
     setDownloading(false);
   };
 
+  const downloadQROnly = () => {
+    if (!teacher) return;
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext("2d");
+
+      if (ctx) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, 400, 400);
+
+        QRCode.toCanvas(canvas, teacher.qr_code, {
+          width: 400,
+          margin: 2,
+          errorCorrectionLevel: "H",
+        }, (error: any) => {
+          if (error) {
+            message.error("Error al generar el código QR");
+            console.error(error);
+          } else {
+            const link = document.createElement("a");
+            link.download = `qr-${teacher.first_name}-${teacher.last_name}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+            message.success("Código QR descargado exitosamente");
+          }
+        });
+      }
+    } catch (error) {
+      message.error("Error al descargar el código QR");
+      console.error(error);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
@@ -81,6 +119,21 @@ export const TeacherShow: React.FC = () => {
       </div>
     );
   }
+
+  const downloadMenuItems: MenuProps['items'] = [
+    {
+      key: 'credential',
+      label: 'Credencial Completa',
+      icon: <DownloadOutlined />,
+      onClick: downloadCredential,
+    },
+    {
+      key: 'qr',
+      label: 'Solo Código QR',
+      icon: <QrcodeOutlined />,
+      onClick: downloadQROnly,
+    },
+  ];
 
   return (
     <div style={{ padding: 24 }}>
@@ -100,14 +153,15 @@ export const TeacherShow: React.FC = () => {
         >
           Editar
         </Button>
-        <Button
-          type="default"
-          icon={<DownloadOutlined />}
-          onClick={downloadCredential}
-          loading={downloading}
-        >
-          Descargar Credencial
-        </Button>
+        <Dropdown menu={{ items: downloadMenuItems }} placement="bottomRight">
+          <Button
+            type="default"
+            icon={<DownloadOutlined />}
+            loading={downloading}
+          >
+            Descargar
+          </Button>
+        </Dropdown>
       </div>
 
       {/* Credencial del Maestro */}

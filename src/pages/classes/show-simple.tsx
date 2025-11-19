@@ -73,6 +73,12 @@ export const ClassShowSimple: React.FC = () => {
           <Descriptions.Item label="Número de Clase">
             {classData.class_number}
           </Descriptions.Item>
+          <Descriptions.Item label="Hora de Inicio (Registro de Asistencia)">
+            {classData.start_time ? classData.start_time.substring(0, 5) : "No configurado"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Hora de Fin (Registro de Asistencia)">
+            {classData.end_time ? classData.end_time.substring(0, 5) : "No configurado"}
+          </Descriptions.Item>
           <Descriptions.Item label="Fecha de Creación">
             {new Date(classData.created_at).toLocaleString("es-ES")}
           </Descriptions.Item>

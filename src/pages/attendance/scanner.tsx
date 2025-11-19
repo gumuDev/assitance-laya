@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Card, Alert, Tag, Spin, Button, Typography } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined, CameraOutlined } from "@ant-design/icons";
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { Card, Alert, Tag, Spin, Button, Typography, Upload, Divider, Row, Col } from "antd";
+import { CheckCircleOutlined, CloseCircleOutlined, CameraOutlined, UploadOutlined, FileImageOutlined } from "@ant-design/icons";
+import { BrowserMultiFormatReader, BrowserQRCodeReader } from "@zxing/library";
 import { supabaseClient } from "../../utility/supabaseClient";
 import type { ITeacher, IMember } from "../../interfaces";
 
@@ -30,6 +30,20 @@ export const AttendanceScanner: React.FC = () => {
       stopScanning();
     };
   }, []);
+
+  // Auto-ocultar solo mensajes de éxito después de 3 segundos
+  useEffect(() => {
+    if (lastResult && lastResult.success) {
+      const timer = setTimeout(() => {
+        setLastResult(null);
+        if (!scanning) {
+          startScanning();
+        }
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [lastResult]);
 
   const requestCameraPermission = async () => {
     try {
@@ -157,6 +171,109 @@ Si el problema persiste, intenta:
     setScanning(false);
   };
 
+  const handleImageUpload = async (file: File) => {
+    setProcessing(true);
+
+    try {
+      const codeReader = new BrowserQRCodeReader();
+
+      // Crear URL del archivo para decodificar directamente
+      const imageUrl = URL.createObjectURL(file);
+
+      try {
+        // Método 1: Intentar decodificar directamente desde la URL del archivo
+        console.log("Intentando leer QR desde archivo...");
+        const result = await codeReader.decodeFromImageUrl(imageUrl);
+
+        if (result) {
+          const qrCode = result.getText();
+          console.log("✅ QR detectado desde imagen:", qrCode);
+          URL.revokeObjectURL(imageUrl); // Limpiar URL
+          await handleQRCode(qrCode);
+          return false;
+        }
+      } catch (error1) {
+        console.log("Método 1 falló, intentando método alternativo...", error1);
+
+        // Método 2: Intentar con imagen element
+        try {
+          const img = new Image();
+          img.src = imageUrl;
+
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+
+          console.log("Imagen cargada, intentando decodificar...");
+          const result2 = await codeReader.decodeFromImageElement(img);
+
+          if (result2) {
+            const qrCode = result2.getText();
+            console.log("✅ QR detectado desde elemento imagen:", qrCode);
+            URL.revokeObjectURL(imageUrl); // Limpiar URL
+            await handleQRCode(qrCode);
+            return false;
+          }
+        } catch (error2) {
+          console.log("Método 2 falló, intentando método con canvas...", error2);
+
+          // Método 3: Usar canvas manualmente
+          try {
+            const img = new Image();
+            img.src = imageUrl;
+
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+            });
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            if (!context) {
+              throw new Error("No se pudo crear el contexto del canvas");
+            }
+
+            canvas.width = img.width;
+            canvas.height = img.height;
+            context.drawImage(img, 0, 0);
+
+            console.log("Canvas creado, intentando decodificar...");
+
+            // Usar BrowserMultiFormatReader como última opción
+            const multiReader = new BrowserMultiFormatReader();
+            const result3 = await multiReader.decodeFromImageElement(img);
+
+            if (result3) {
+              const qrCode = result3.getText();
+              console.log("✅ QR detectado con MultiFormatReader:", qrCode);
+              URL.revokeObjectURL(imageUrl); // Limpiar URL
+              await handleQRCode(qrCode);
+              return false;
+            }
+          } catch (error3) {
+            console.error("Todos los métodos fallaron:", error3);
+            throw new Error("No se pudo detectar un código QR en la imagen");
+          }
+        }
+      }
+
+      URL.revokeObjectURL(imageUrl); // Limpiar URL
+      throw new Error("No se detectó ningún código QR");
+
+    } catch (error: any) {
+      console.error("❌ Error al procesar la imagen:", error);
+      setLastResult({
+        success: false,
+        message: "No se pudo detectar un código QR en la imagen.\n\nAsegúrate de que:\n- La imagen contenga un código QR visible y claro\n- El QR no esté borroso o pixelado\n- La imagen tenga buena iluminación\n- El QR ocupe una buena parte de la imagen",
+      });
+      setProcessing(false);
+    }
+
+    return false; // Prevenir upload automático
+  };
+
   const handleQRCode = async (qrCode: string) => {
     setProcessing(true);
 
@@ -172,7 +289,9 @@ Si el problema persiste, intenta:
           classes (
             id,
             name,
-            class_number
+            class_number,
+            start_time,
+            end_time
           )
         `)
         .eq("qr_code", qrCode)
@@ -181,11 +300,6 @@ Si el problema persiste, intenta:
       if (teacher) {
         await registerAttendance(teacher, "teacher");
         setProcessing(false);
-        // Esperar 3 segundos antes de reanudar escaneo
-        setTimeout(() => {
-          setLastResult(null);
-          startScanning();
-        }, 3000);
         return;
       }
 
@@ -197,7 +311,9 @@ Si el problema persiste, intenta:
           classes (
             id,
             name,
-            class_number
+            class_number,
+            start_time,
+            end_time
           )
         `)
         .eq("qr_code", qrCode)
@@ -206,11 +322,6 @@ Si el problema persiste, intenta:
       if (member) {
         await registerAttendance(member, "member");
         setProcessing(false);
-        // Esperar 3 segundos antes de reanudar escaneo
-        setTimeout(() => {
-          setLastResult(null);
-          startScanning();
-        }, 3000);
         return;
       }
 
@@ -221,11 +332,6 @@ Si el problema persiste, intenta:
       });
 
       setProcessing(false);
-      // Esperar 3 segundos antes de reanudar escaneo
-      setTimeout(() => {
-        setLastResult(null);
-        startScanning();
-      }, 3000);
     } catch (error) {
       console.error("Error al procesar QR:", error);
       setLastResult({
@@ -234,11 +340,6 @@ Si el problema persiste, intenta:
       });
 
       setProcessing(false);
-      // Esperar 3 segundos antes de reanudar escaneo
-      setTimeout(() => {
-        setLastResult(null);
-        startScanning();
-      }, 3000);
     }
   };
 
@@ -247,7 +348,61 @@ Si el problema persiste, intenta:
     type: "teacher" | "member"
   ) => {
     try {
-      // Verificar si ya registró asistencia hoy
+      // 1. Validar que la persona tenga una clase asignada
+      if (!person.classes) {
+        setLastResult({
+          success: false,
+          message: `⚠️ ${person.first_name} ${person.last_name} no tiene clase asignada\n\nPor favor, asigna una clase a esta persona antes de registrar asistencia.`,
+          personName: `${person.first_name} ${person.last_name}`,
+          personType: type,
+        });
+        return;
+      }
+
+      // 2. Validar horario permitido según la clase
+      const now = new Date();
+      const currentTime = now.toTimeString().split(" ")[0]; // HH:MM:SS
+      const classStartTime = person.classes.start_time;
+      const classEndTime = person.classes.end_time;
+
+      console.log("=== VALIDACIÓN DE HORARIO ===");
+      console.log("Hora actual:", currentTime);
+      console.log("Inicio clase:", classStartTime);
+      console.log("Fin clase:", classEndTime);
+      console.log("Clase:", person.classes.name);
+
+      // Normalizar tiempos a formato HH:MM:SS para comparación correcta
+      const normalizeTime = (time: string) => {
+        // Si el tiempo ya tiene formato HH:MM:SS, devolverlo
+        if (time.split(':').length === 3) return time;
+        // Si solo tiene HH:MM, agregar :00
+        if (time.split(':').length === 2) return `${time}:00`;
+        return time;
+      };
+
+      const normalizedStartTime = normalizeTime(classStartTime);
+      const normalizedEndTime = normalizeTime(classEndTime);
+
+      console.log("Inicio normalizado:", normalizedStartTime);
+      console.log("Fin normalizado:", normalizedEndTime);
+
+      if (currentTime < normalizedStartTime || currentTime > normalizedEndTime) {
+        const startTime = classStartTime.substring(0, 5); // HH:MM
+        const endTime = classEndTime.substring(0, 5); // HH:MM
+        console.log("❌ FUERA DE HORARIO");
+        setLastResult({
+          success: false,
+          message: `⏰ Fuera de horario permitido\n\nLa clase "${person.classes.name} - ${person.classes.class_number}" permite registro de asistencia entre las ${startTime} y las ${endTime}.\n\nHora actual: ${now.toLocaleTimeString("es-ES")}`,
+          personName: `${person.first_name} ${person.last_name}`,
+          personType: type,
+          className: `${person.classes.name} - ${person.classes.class_number}`,
+        });
+        return;
+      }
+
+      console.log("✅ DENTRO DE HORARIO - Continuando con registro...");
+
+      // 3. Verificar si ya registró asistencia hoy
       const today = new Date().toISOString().split("T")[0];
 
       const { data: existingAttendance } = await supabaseClient
@@ -256,7 +411,7 @@ Si el problema persiste, intenta:
         .eq("person_type", type)
         .eq("person_id", person.id)
         .eq("date", today)
-        .single();
+        .maybeSingle();
 
       if (existingAttendance) {
         setLastResult({
@@ -298,7 +453,6 @@ Si el problema persiste, intenta:
         success: false,
         message: "Error al registrar asistencia: " + error.message,
       });
-      setTimeout(() => setLastResult(null), 5000);
     }
   };
 
@@ -309,126 +463,179 @@ Si el problema persiste, intenta:
         Escanea el código QR de la credencial para registrar asistencia
       </p>
 
-      <div style={{ maxWidth: 600, margin: "0 auto" }}>
-        {/* Video de la cámara */}
-        <Card>
-          <div style={{
-            position: "relative",
-            width: "100%",
-            paddingBottom: "75%",
-            background: "#000",
-            borderRadius: 8,
-            overflow: "hidden",
-          }}>
-            <video
-              ref={videoRef}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-            {!scanning && (
-              <div style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                color: "white",
-                textAlign: "center",
-              }}>
-                <CameraOutlined style={{ fontSize: 48, marginBottom: 16 }} />
-                <div>Iniciando cámara...</div>
-              </div>
-            )}
-            {processing && (
-              <div style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                background: "rgba(0,0,0,0.7)",
-                padding: 20,
-                borderRadius: 8,
-              }}>
-                <Spin size="large" />
-              </div>
-            )}
-          </div>
+      <Row gutter={[24, 24]}>
+        {/* Columna Izquierda: Scanner y Opciones */}
+        <Col xs={24} lg={14}>
+          {/* Video de la cámara */}
+          <Card>
+            <div style={{
+              position: "relative",
+              width: "100%",
+              paddingBottom: "75%",
+              background: "#000",
+              borderRadius: 8,
+              overflow: "hidden",
+            }}>
+              <video
+                ref={videoRef}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+              {!scanning && (
+                <div style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  color: "white",
+                  textAlign: "center",
+                }}>
+                  <CameraOutlined style={{ fontSize: 48, marginBottom: 16 }} />
+                  <div>Iniciando cámara...</div>
+                </div>
+              )}
+              {processing && (
+                <div style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  background: "rgba(0,0,0,0.7)",
+                  padding: 20,
+                  borderRadius: 8,
+                }}>
+                  <Spin size="large" />
+                </div>
+              )}
+            </div>
 
-          <div style={{ marginTop: 16, textAlign: "center" }}>
-            {scanning ? (
-              <Tag color="green" icon={<CheckCircleOutlined />}>
-                Cámara activa - Listo para escanear
-              </Tag>
-            ) : (
-              <Tag color="orange">Iniciando cámara...</Tag>
-            )}
-          </div>
-        </Card>
+            <div style={{ marginTop: 16, textAlign: "center" }}>
+              {scanning ? (
+                <Tag color="green" icon={<CheckCircleOutlined />}>
+                  Cámara activa - Listo para escanear
+                </Tag>
+              ) : (
+                <Tag color="orange">Iniciando cámara...</Tag>
+              )}
+            </div>
+          </Card>
 
-        {/* Resultado del último escaneo */}
-        {lastResult && (
-          <div style={{ marginTop: 24 }}>
-            <Alert
-              type={lastResult.success ? "success" : "error"}
-              message={lastResult.success ? lastResult.message : <strong>{lastResult.message.split('\n')[0]}</strong>}
-              description={
-                <>
-                  {lastResult.personName && (
-                    <div style={{ marginTop: 8 }}>
-                      <p><strong>Persona:</strong> {lastResult.personName}</p>
-                      <p><strong>Tipo:</strong> {" "}
-                        <Tag color={lastResult.personType === "teacher" ? "blue" : "green"}>
-                          {lastResult.personType === "teacher" ? "MAESTRO" : "MIEMBRO"}
-                        </Tag>
-                      </p>
-                      {lastResult.className && (
-                        <p><strong>Clase:</strong> {lastResult.className}</p>
-                      )}
-                      <p><strong>Hora:</strong> {new Date().toLocaleTimeString("es-ES")}</p>
-                    </div>
-                  )}
-                  {!lastResult.success && lastResult.message.includes('\n') && (
-                    <Paragraph style={{ marginTop: 12, whiteSpace: "pre-line" }}>
-                      {lastResult.message.split('\n').slice(1).join('\n')}
-                    </Paragraph>
-                  )}
-                  {!lastResult.success && (
+          {/* Opción alternativa: Subir imagen */}
+          <Card style={{ marginTop: 24 }} title={<><FileImageOutlined /> Opción Alternativa</>}>
+            <p style={{ marginBottom: 16 }}>
+              Si la cámara no funciona, puedes subir una imagen del código QR:
+            </p>
+            <Upload
+              accept="image/*"
+              beforeUpload={handleImageUpload}
+              showUploadList={false}
+              disabled={processing}
+            >
+              <Button
+                icon={<UploadOutlined />}
+                size="large"
+                block
+                disabled={processing}
+                loading={processing}
+              >
+                {processing ? "Procesando imagen..." : "Subir Imagen del QR"}
+              </Button>
+            </Upload>
+            <p style={{ marginTop: 12, fontSize: 12, color: "#888" }}>
+              Formatos soportados: JPG, PNG, JPEG. La imagen debe contener un código QR visible.
+            </p>
+          </Card>
+
+          {/* Resultado del último escaneo */}
+          {lastResult && (
+            <div style={{ marginTop: 24 }}>
+              <Alert
+                type={lastResult.success ? "success" : "error"}
+                message={lastResult.success ? lastResult.message : <strong>{lastResult.message.split('\n')[0]}</strong>}
+                description={
+                  <>
+                    {lastResult.personName && (
+                      <div style={{ marginTop: 8 }}>
+                        <p><strong>Persona:</strong> {lastResult.personName}</p>
+                        <p><strong>Tipo:</strong> {" "}
+                          <Tag color={lastResult.personType === "teacher" ? "blue" : "green"}>
+                            {lastResult.personType === "teacher" ? "MAESTRO" : "MIEMBRO"}
+                          </Tag>
+                        </p>
+                        {lastResult.className && (
+                          <p><strong>Clase:</strong> {lastResult.className}</p>
+                        )}
+                        <p><strong>Hora:</strong> {new Date().toLocaleTimeString("es-ES")}</p>
+                      </div>
+                    )}
+                    {!lastResult.success && lastResult.message.includes('\n') && (
+                      <Paragraph style={{ marginTop: 12, whiteSpace: "pre-line" }}>
+                        {lastResult.message.split('\n').slice(1).join('\n')}
+                      </Paragraph>
+                    )}
                     <Button
                       type="primary"
-                      icon={<CameraOutlined />}
                       onClick={() => {
                         setLastResult(null);
-                        stopScanning();
-                        setTimeout(requestCameraPermission, 500);
+                        if (!scanning) {
+                          startScanning();
+                        }
                       }}
                       style={{ marginTop: 12 }}
                       size="large"
+                      block
                     >
-                      Activar Cámara
+                      Aceptar
                     </Button>
-                  )}
-                </>
-              }
-              showIcon
-              icon={lastResult.success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
-            />
-          </div>
-        )}
+                  </>
+                }
+                showIcon
+                icon={lastResult.success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+              />
+            </div>
+          )}
+        </Col>
 
-        <Card style={{ marginTop: 24 }} title="Instrucciones">
-          <ol>
-            <li>Permite el acceso a la cámara cuando el navegador lo solicite</li>
-            <li>Coloca el código QR de la credencial frente a la cámara</li>
-            <li>El sistema registrará la asistencia automáticamente</li>
-            <li>Solo se puede registrar una asistencia por persona por día</li>
-          </ol>
-        </Card>
-      </div>
+        {/* Columna Derecha: Instrucciones */}
+        <Col xs={24} lg={10}>
+          <Card title="📋 Instrucciones" style={{ position: "sticky", top: 24 }}>
+            <div style={{ marginBottom: 20 }}>
+              <strong>Opción 1: Escaneo con Cámara</strong>
+              <ol style={{ marginTop: 8, marginBottom: 0 }}>
+                <li>Permite el acceso a la cámara cuando el navegador lo solicite</li>
+                <li>Coloca el código QR de la credencial frente a la cámara</li>
+                <li>El sistema registrará la asistencia automáticamente</li>
+              </ol>
+            </div>
+
+            <Divider />
+
+            <div style={{ marginBottom: 20 }}>
+              <strong>Opción 2: Subir Imagen</strong>
+              <ol style={{ marginTop: 8, marginBottom: 0 }}>
+                <li>Toma una foto del código QR con tu teléfono o cámara</li>
+                <li>Usa el botón "Subir Imagen del QR"</li>
+                <li>Selecciona la imagen del código QR</li>
+                <li>El sistema procesará la imagen automáticamente</li>
+              </ol>
+            </div>
+
+            <Alert
+              message="Nota Importante"
+              description="Solo se puede registrar una asistencia por persona por día, y debe estar dentro del horario permitido de la clase."
+              type="info"
+              showIcon
+              style={{ marginTop: 16 }}
+            />
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 };

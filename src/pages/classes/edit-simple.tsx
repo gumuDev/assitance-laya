@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, Card, message, Spin } from "antd";
+import { Form, Input, Button, Card, message, Spin, TimePicker } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabaseClient } from "../../utility/supabaseClient";
+import dayjs from "dayjs";
 
 export const ClassEditSimple: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -27,7 +28,11 @@ export const ClassEditSimple: React.FC = () => {
     if (error) {
       message.error("Error al cargar la clase: " + error.message);
     } else if (data) {
-      form.setFieldsValue(data);
+      form.setFieldsValue({
+        ...data,
+        start_time: dayjs(data.start_time, "HH:mm:ss"),
+        end_time: dayjs(data.end_time, "HH:mm:ss"),
+      });
     }
     setFetchLoading(false);
   };
@@ -35,11 +40,24 @@ export const ClassEditSimple: React.FC = () => {
   const onFinish = async (values: any) => {
     if (!id) return;
     setLoading(true);
+
+    // Validar que la hora de inicio sea menor que la hora de fin
+    const startTime = values.start_time.format("HH:mm:ss");
+    const endTime = values.end_time.format("HH:mm:ss");
+
+    if (startTime >= endTime) {
+      message.error("La hora de inicio debe ser menor que la hora de fin");
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabaseClient
       .from("classes")
       .update({
         name: values.name,
         class_number: values.class_number,
+        start_time: startTime,
+        end_time: endTime,
       })
       .eq("id", id);
 
@@ -100,6 +118,43 @@ export const ClassEditSimple: React.FC = () => {
           >
             <Input placeholder="Ej: MAT-101" />
           </Form.Item>
+
+          <Form.Item
+            label="Hora de Inicio (Registro de Asistencia)"
+            name="start_time"
+            rules={[
+              {
+                required: true,
+                message: "Por favor seleccione la hora de inicio",
+              },
+            ]}
+            help="Hora desde la cual se puede registrar asistencia para esta clase"
+          >
+            <TimePicker
+              format="HH:mm"
+              placeholder="Selecciona hora de inicio"
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Hora de Fin (Registro de Asistencia)"
+            name="end_time"
+            rules={[
+              {
+                required: true,
+                message: "Por favor seleccione la hora de fin",
+              },
+            ]}
+            help="Hora hasta la cual se puede registrar asistencia para esta clase"
+          >
+            <TimePicker
+              format="HH:mm"
+              placeholder="Selecciona hora de fin"
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
+
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading}>
               Guardar
