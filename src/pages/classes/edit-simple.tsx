@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, Card, message, Spin, TimePicker } from "antd";
+import { Form, Input, Button, Card, message, Spin, TimePicker, Select } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabaseClient } from "../../utility/supabaseClient";
@@ -56,6 +56,7 @@ export const ClassEditSimple: React.FC = () => {
       .update({
         name: values.name,
         class_number: values.class_number,
+        day_of_week: values.day_of_week,
         start_time: startTime,
         end_time: endTime,
       })
@@ -117,6 +118,28 @@ export const ClassEditSimple: React.FC = () => {
             ]}
           >
             <Input placeholder="Ej: MAT-101" />
+          </Form.Item>
+
+          <Form.Item
+            label="Día de la Semana"
+            name="day_of_week"
+            rules={[
+              {
+                required: true,
+                message: "Por favor seleccione el día de la clase",
+              },
+            ]}
+            help="Día en que se imparte esta clase"
+          >
+            <Select placeholder="Selecciona el día">
+              <Select.Option value="Lunes">Lunes</Select.Option>
+              <Select.Option value="Martes">Martes</Select.Option>
+              <Select.Option value="Miércoles">Miércoles</Select.Option>
+              <Select.Option value="Jueves">Jueves</Select.Option>
+              <Select.Option value="Viernes">Viernes</Select.Option>
+              <Select.Option value="Sábado">Sábado</Select.Option>
+              <Select.Option value="Domingo">Domingo</Select.Option>
+            </Select>
           </Form.Item>
 
           <Form.Item

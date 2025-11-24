@@ -73,6 +73,9 @@ export const ClassShowSimple: React.FC = () => {
           <Descriptions.Item label="Número de Clase">
             {classData.class_number}
           </Descriptions.Item>
+          <Descriptions.Item label="Día de la Semana">
+            {classData.day_of_week}
+          </Descriptions.Item>
           <Descriptions.Item label="Hora de Inicio (Registro de Asistencia)">
             {classData.start_time ? classData.start_time.substring(0, 5) : "No configurado"}
           </Descriptions.Item>

@@ -30,6 +30,8 @@ import {
 } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import quarterOfYear from "dayjs/plugin/quarterOfYear";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+import "dayjs/locale/es";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -48,6 +50,7 @@ import { supabaseClient } from "../../utility/supabaseClient";
 import type { IAttendance, IClass, ITeacher, IMember } from "../../interfaces";
 
 dayjs.extend(quarterOfYear);
+dayjs.extend(isSameOrBefore);
 
 // Registrar componentes de Chart.js
 ChartJS.register(
@@ -82,7 +85,8 @@ export const Reports: React.FC = () => {
     "month" | "quarter" | "year" | "custom"
   >("custom");
   const [rankingView, setRankingView] = useState<"classes" | "teachers" | "members">("classes");
-  const [mainView, setMainView] = useState<"rankings" | "charts">("rankings");
+  const [mainView, setMainView] = useState<"rankings" | "charts" | "classAttendance">("rankings");
+  const [selectedClassForReport, setSelectedClassForReport] = useState<string | null>(null);
 
   // Referencias para los gráficos
   const barChartRef = useRef<any>(null);
@@ -487,6 +491,80 @@ export const Reports: React.FC = () => {
     }));
   };
 
+  // Función para obtener todas las fechas de un día específico en un rango
+  const getDatesForDayOfWeek = (dayOfWeek: string, startDate: Dayjs, endDate: Dayjs): string[] => {
+    const dayMap: Record<string, number> = {
+      'Domingo': 0,
+      'Lunes': 1,
+      'Martes': 2,
+      'Miércoles': 3,
+      'Jueves': 4,
+      'Viernes': 5,
+      'Sábado': 6,
+    };
+
+    const targetDay = dayMap[dayOfWeek];
+    const dates: string[] = [];
+    let currentDate = startDate.clone();
+
+    // Encontrar el primer día que coincida
+    while (currentDate.day() !== targetDay && currentDate.isBefore(endDate)) {
+      currentDate = currentDate.add(1, 'day');
+    }
+
+    // Agregar todas las fechas que coincidan
+    while (currentDate.isSameOrBefore(endDate)) {
+      dates.push(currentDate.format('YYYY-MM-DD'));
+      currentDate = currentDate.add(7, 'days');
+    }
+
+    return dates;
+  };
+
+  // Función para obtener reporte de asistencia por clase
+  const getClassAttendanceReport = () => {
+    if (!selectedClassForReport) return [];
+
+    const selectedClass = classes.find(c => c.id === selectedClassForReport);
+    if (!selectedClass) return [];
+
+    // Obtener todos los días que debería haber clase en el rango
+    const expectedDates = getDatesForDayOfWeek(
+      selectedClass.day_of_week,
+      dateRange[0],
+      dateRange[1]
+    );
+
+    // Filtrar miembros de esta clase
+    const classMembers = members.filter(m => m.class_id === selectedClassForReport);
+
+    // Para cada miembro, calcular su asistencia
+    return classMembers.map(member => {
+      const memberAttendances = attendances.filter(
+        att => att.person_id === member.id && att.person_type === 'member'
+      );
+
+      const attendedDates = memberAttendances.map(att => att.date);
+      const missedDates = expectedDates.filter(date => !attendedDates.includes(date));
+
+      const totalExpected = expectedDates.length;
+      const totalAttended = attendedDates.length;
+      const totalMissed = missedDates.length;
+      const percentage = totalExpected > 0 ? Math.round((totalAttended / totalExpected) * 100) : 0;
+
+      return {
+        id: member.id,
+        name: `${member.first_name} ${member.last_name}`,
+        totalAttended,
+        totalMissed,
+        totalExpected,
+        percentage,
+        attendedDates: attendedDates.sort(),
+        missedDates: missedDates.sort(),
+      };
+    }).sort((a, b) => b.percentage - a.percentage);
+  };
+
   // Calcular estadísticas
   const totalAttendances = attendances.length;
   const teacherAttendances = attendances.filter(
@@ -662,7 +740,7 @@ export const Reports: React.FC = () => {
         <Card>
           <Tabs
             activeKey={mainView}
-            onChange={(key) => setMainView(key as "rankings" | "charts")}
+            onChange={(key) => setMainView(key as "rankings" | "charts" | "classAttendance")}
             size="large"
             items={[
               {
@@ -934,6 +1012,150 @@ export const Reports: React.FC = () => {
             </Row>
           </Card>
         </>
+                ),
+              },
+              {
+                key: "classAttendance",
+                label: (
+                  <span>
+                    <ProjectOutlined /> Asistencia por Clase
+                  </span>
+                ),
+                children: (
+                  <>
+                    {/* Selector de Clase */}
+                    <Card style={{ marginBottom: 16 }}>
+                      <Space direction="vertical" style={{ width: "100%" }}>
+                        <Text strong>Selecciona una clase para ver el reporte detallado:</Text>
+                        <Select
+                          style={{ width: "100%" }}
+                          placeholder="Selecciona una clase"
+                          value={selectedClassForReport}
+                          onChange={setSelectedClassForReport}
+                          options={classes.map((c) => ({
+                            label: `${c.name} - ${c.class_number} (${c.day_of_week})`,
+                            value: c.id,
+                          }))}
+                        />
+                      </Space>
+                    </Card>
+
+                    {/* Tabla de Asistencia */}
+                    {selectedClassForReport ? (
+                      <Card title="Reporte de Asistencia de Miembros">
+                        <Table
+                          dataSource={getClassAttendanceReport()}
+                          rowKey="id"
+                          pagination={false}
+                          expandable={{
+                            expandedRowRender: (record) => (
+                              <div style={{ padding: '16px 0' }}>
+                                <Row gutter={16}>
+                                  <Col span={12}>
+                                    <Card size="small" title="✅ Fechas Asistidas" style={{ backgroundColor: '#f6ffed' }}>
+                                      {record.attendedDates.length > 0 ? (
+                                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                                          {record.attendedDates.map((date: string) => (
+                                            <li key={date} style={{ marginBottom: 8 }}>
+                                              <div>{dayjs(date).locale('es').format('DD/MM/YYYY - dddd')}</div>
+                                              <div style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 16 }}>
+                                                {dayjs(date).locale('en').format('dddd')}
+                                              </div>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <Text type="secondary">No hay fechas registradas</Text>
+                                      )}
+                                    </Card>
+                                  </Col>
+                                  <Col span={12}>
+                                    <Card size="small" title="❌ Fechas Faltadas" style={{ backgroundColor: '#fff1f0' }}>
+                                      {record.missedDates.length > 0 ? (
+                                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                                          {record.missedDates.map((date: string) => (
+                                            <li key={date} style={{ marginBottom: 8 }}>
+                                              <div>{dayjs(date).locale('es').format('DD/MM/YYYY - dddd')}</div>
+                                              <div style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 16 }}>
+                                                {dayjs(date).locale('en').format('dddd')}
+                                              </div>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <Text type="secondary">¡Asistencia perfecta!</Text>
+                                      )}
+                                    </Card>
+                                  </Col>
+                                </Row>
+                              </div>
+                            ),
+                            rowExpandable: () => true,
+                          }}
+                          columns={[
+                            {
+                              title: "Nombre del Miembro",
+                              dataIndex: "name",
+                              key: "name",
+                              render: (name: string) => (
+                                <span>
+                                  👤 {name}
+                                </span>
+                              ),
+                            },
+                            {
+                              title: "Días Asistidos",
+                              dataIndex: "totalAttended",
+                              key: "totalAttended",
+                              align: "center",
+                              render: (total: number) => (
+                                <Tag color="green">{total}</Tag>
+                              ),
+                            },
+                            {
+                              title: "Días Faltados",
+                              dataIndex: "totalMissed",
+                              key: "totalMissed",
+                              align: "center",
+                              render: (total: number) => (
+                                <Tag color={total > 0 ? "red" : "default"}>{total}</Tag>
+                              ),
+                            },
+                            {
+                              title: "Total Esperado",
+                              dataIndex: "totalExpected",
+                              key: "totalExpected",
+                              align: "center",
+                            },
+                            {
+                              title: "Porcentaje",
+                              dataIndex: "percentage",
+                              key: "percentage",
+                              align: "center",
+                              sorter: (a, b) => a.percentage - b.percentage,
+                              render: (percentage: number) => (
+                                <Tag color={
+                                  percentage >= 90 ? "green" :
+                                  percentage >= 70 ? "blue" :
+                                  percentage >= 50 ? "orange" : "red"
+                                }>
+                                  {percentage}%
+                                </Tag>
+                              ),
+                            },
+                          ]}
+                        />
+                      </Card>
+                    ) : (
+                      <Card>
+                        <div style={{ textAlign: "center", padding: 50 }}>
+                          <Text type="secondary">
+                            Por favor selecciona una clase para ver el reporte
+                          </Text>
+                        </div>
+                      </Card>
+                    )}
+                  </>
                 ),
               },
             ]}
